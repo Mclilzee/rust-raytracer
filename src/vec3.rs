@@ -1,26 +1,24 @@
 use core::f64::math::mul_add;
 use std::{
-    ops::{Add, Mul},
-    random::{Rng, SystemRng},
+    intrinsics::minimumf64,
+    ops::{Add, Div, Mul, Neg, Sub},
     simd::{Simd, num::SimdFloat},
 };
 
-use rand::RngExt;
-pub const ZERO: Vec3 = Vec3::new(0.0, 0.0, 0.0);
-pub const ONE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
-
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Copy)]
 pub struct Vec3 {
     pub value: Simd<f64, 3>,
 }
 
 impl Vec3 {
+    pub const ZERO: Vec3 = Vec3::new(0.0, 0.0, 0.0);
+    pub const ONE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
     pub fn random_unit_vector_with_range(min: f64, max: f64) -> Self {
         loop {
             let p = Simd::from_array([
-                mul_add(rand::random::<f64>(), (max - min), min),
-                mul_add(rand::random::<f64>(), (max - min), min),
-                mul_add(rand::random::<f64>(), (max - min), min),
+                mul_add(rand::random::<f64>(), max - min, min),
+                mul_add(rand::random::<f64>(), max - min, min),
+                mul_add(rand::random::<f64>(), max - min, min),
             ]);
 
             let length = (p * p).reduce_sum() as f64;
@@ -88,14 +86,20 @@ impl Vec3 {
     }
 
     pub fn near_zero(&self) -> bool {
-        const s: Simd<f64, 3> = Simd::splat(1e-8);
-        self.value < s
+        const S: Simd<f64, 3> = Simd::splat(1e-8);
+        self.value < S
     }
 
     pub fn reflect(self, rhs: Self) -> Vec3 {
         Self {
             value: self.value - Simd::splat(2.) * Simd::splat(self.dot(&rhs)) * rhs.value,
         }
+    }
+
+    pub fn refract(self, rhs: &Vec3, etai_over_etat: f64) -> Vec3 {
+        let cos_theta = minimumf64(-self.dot(rhs), 1.0);
+        let r_out_perp = etai_over_etat * cos_theta * rhs + self;
+        -(1.0 - r_out_perp.dot(&r_out_perp)).abs().sqrt() * rhs + r_out_perp
     }
 }
 
@@ -127,20 +131,119 @@ impl Add for Vec3 {
     }
 }
 
-impl Add for &Vec3 {
+impl Add<&Vec3> for Vec3 {
     type Output = Vec3;
 
-    fn add(self, rhs: Self) -> Self::Output {
+    fn add(self, rhs: &Vec3) -> Self::Output {
         Vec3 {
             value: self.value + rhs.value,
         }
     }
 }
 
-impl Mul<f64> for Vec3 {
+impl Add<&Vec3> for f64 {
+    type Output = Vec3;
+
+    fn add(self, rhs: &Vec3) -> Self::Output {
+        Vec3 {
+            value: Simd::splat(self) + rhs.value,
+        }
+    }
+}
+
+impl Mul<&Vec3> for f64 {
+    type Output = Vec3;
+    fn mul(self, rhs: &Vec3) -> Self::Output {
+        Vec3 {
+            value: Simd::splat(self) * rhs.value,
+        }
+    }
+}
+
+impl Mul<Vec3> for f64 {
+    type Output = Vec3;
+
+    fn mul(self, rhs: Vec3) -> Self::Output {
+        Vec3 {
+            value: Simd::splat(self) * rhs.value,
+        }
+    }
+}
+
+impl Sub for Vec3 {
     type Output = Self;
 
-    fn mul(self, rhs: f64) -> Self::Output {
-        self * Self::splat(rhs)
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value - rhs.value,
+        }
+    }
+}
+
+impl Sub<&Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, rhs: &Vec3) -> Self::Output {
+        Vec3 {
+            value: self.value - rhs.value,
+        }
+    }
+}
+
+impl Sub<&Vec3> for f64 {
+    type Output = Vec3;
+
+    fn sub(self, rhs: &Vec3) -> Self::Output {
+        Vec3 {
+            value: Simd::splat(self) - rhs.value,
+        }
+    }
+}
+
+impl Div for Vec3 {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value / rhs.value,
+        }
+    }
+}
+
+impl Div<&Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn div(self, rhs: &Vec3) -> Self::Output {
+        Vec3 {
+            value: self.value / rhs.value,
+        }
+    }
+}
+
+impl Div<&Vec3> for f64 {
+    type Output = Vec3;
+
+    fn div(self, rhs: &Vec3) -> Self::Output {
+        Vec3 {
+            value: Simd::splat(self) / rhs.value,
+        }
+    }
+}
+
+impl Div<f64> for Vec3 {
+    type Output = Vec3;
+
+    fn div(self, rhs: f64) -> Self::Output {
+        Self {
+            value: self.value / Simd::splat(rhs),
+        }
+    }
+}
+
+impl Neg for Vec3 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Vec3 { value: -self.value }
     }
 }

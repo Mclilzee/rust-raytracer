@@ -1,30 +1,29 @@
-use std::simd::Simd;
-
 use crate::vec3::Vec3;
 
-pub const GREEN: Color = Color { r: 0, g: 255, b: 0 };
-pub const RED: Color = Color { r: 255, g: 0, b: 0 };
-pub const BLUE: Color = Color { r: 0, g: 0, b: 255 };
-pub const WHITE: Color = Color {
-    r: 255,
-    g: 255,
-    b: 255,
-};
-pub const BLACK: Color = Color { r: 0, g: 0, b: 0 };
-
+#[derive(Clone)]
 pub struct Color {
     r: u8,
     g: u8,
     b: u8,
 }
 
-impl Into<[u8; 3]> for Color {
-    fn into(self) -> [u8; 3] {
-        [self.r, self.g, self.b]
+impl From<&Color> for [u8; 3] {
+    fn from(value: &Color) -> Self {
+        [value.r, value.g, value.b]
     }
 }
 
 impl Color {
+    pub const GREEN: Color = Color { r: 0, g: 255, b: 0 };
+    pub const RED: Color = Color { r: 255, g: 0, b: 0 };
+    pub const BLUE: Color = Color { r: 0, g: 0, b: 255 };
+    pub const WHITE: Color = Color {
+        r: 255,
+        g: 255,
+        b: 255,
+    };
+    pub const BLACK: Color = Color { r: 0, g: 0, b: 0 };
+
     pub fn init(r: u8, g: u8, b: u8) -> Self {
         Color { r, g, b }
     }
@@ -40,11 +39,11 @@ impl From<Vec3> for Color {
         .clamp(0., 0.999);
 
         let color = Vec3::new(256.0, 256.0, 256.0) * gamma_vec;
-        return Self {
+        Self {
             r: color.x() as u8,
             g: color.y() as u8,
             b: color.z() as u8,
-        };
+        }
     }
 }
 
@@ -53,5 +52,5 @@ fn linear_to_gamma(n: f64) -> f64 {
         return n.sqrt();
     }
 
-    return 0.;
+    0.
 }
