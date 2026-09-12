@@ -1,5 +1,5 @@
 #![allow(internal_features)]
-#![feature(portable_simd, core_float_math, core_intrinsics)]
+#![feature(portable_simd, core_float_math)]
 
 use std::sync::Arc;
 

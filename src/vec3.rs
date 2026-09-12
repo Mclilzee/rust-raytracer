@@ -1,6 +1,5 @@
 use core::f64::math::mul_add;
 use std::{
-    intrinsics::minimumf64,
     ops::{Add, Div, Mul, Neg, Sub},
     simd::{Simd, num::SimdFloat},
 };
@@ -26,6 +25,20 @@ impl Vec3 {
                 return Self {
                     value: p / Simd::splat(length.sqrt()),
                 };
+            }
+        }
+    }
+
+    pub fn random_in_unit_disk(min: f64, max: f64) -> Self {
+        loop {
+            let p = Vec3::new(
+                mul_add(rand::random::<f64>(), max - min, min),
+                mul_add(rand::random::<f64>(), max - min, min),
+                0.,
+            );
+
+            if p.dot(&p) < 1. {
+                return p;
             }
         }
     }
@@ -86,20 +99,20 @@ impl Vec3 {
     }
 
     pub fn near_zero(&self) -> bool {
-        const S: Simd<f64, 3> = Simd::splat(1e-8);
-        self.value < S
+        let s: Simd<f64, 3> = Simd::splat(1e-8);
+        self.value.abs() < s
     }
 
-    pub fn reflect(self, rhs: Self) -> Vec3 {
+    pub fn reflect(&self, rhs: &Self) -> Vec3 {
         Self {
-            value: self.value - Simd::splat(2.) * Simd::splat(self.dot(&rhs)) * rhs.value,
+            value: self.value - Simd::splat(2.) * Simd::splat(self.dot(rhs)) * rhs.value,
         }
     }
 
-    pub fn refract(self, rhs: &Vec3, etai_over_etat: f64) -> Vec3 {
-        let cos_theta = minimumf64(-self.dot(rhs), 1.0);
-        let r_out_perp = etai_over_etat * cos_theta * rhs + self;
-        -(1.0 - r_out_perp.dot(&r_out_perp)).abs().sqrt() * rhs + r_out_perp
+    pub fn refract(&self, rhs: &Vec3, etai_over_etat: f64) -> Vec3 {
+        let cos_theta = (-self).dot(rhs).min(1.0);
+        let r_out_perp = etai_over_etat * (cos_theta * rhs + self);
+        -((1.0 - r_out_perp.dot(&r_out_perp)).abs()).sqrt() * rhs + r_out_perp
     }
 }
 
@@ -244,6 +257,14 @@ impl Neg for Vec3 {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
+        Vec3 { value: -self.value }
+    }
+}
+
+impl Neg for &Vec3 {
+    type Output = Vec3;
+
+    fn neg(self) -> Vec3 {
         Vec3 { value: -self.value }
     }
 }

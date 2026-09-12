@@ -5,16 +5,18 @@ use std::{
 
 use crate::{color::Color, material::Material, vec3::Vec3, world::World};
 
+const DEFOCUS_ANGLE: f64 = 0.06;
+const FOCUS_DIST: f64 = 10.0;
 const VFOV: f64 = 20.0;
-const LOOK_FROM: Vec3 = Vec3::new(-2.0, 2.0, 1.0);
-const LOOK_AT: Vec3 = Vec3::new(0.0, 0.0, -1.0);
+const LOOK_FROM: Vec3 = Vec3::new(13., 2.0, 3.0);
+const LOOK_AT: Vec3 = Vec3::ZERO;
 const VUP: Vec3 = Vec3::new(0.0, 1.0, 0.0);
 
 const THETA: f64 = f64::to_radians(VFOV);
 const ASPECT_RATIO: f64 = 16.0 / 9.0;
 const ANTI_ALIACING_SAMPLES: usize = 100;
 const PIXEL_SAMPLES_SCALE: Vec3 = Vec3::splat(1.0 / ANTI_ALIACING_SAMPLES as f64);
-const IMAGE_WIDTH: usize = 400;
+const IMAGE_WIDTH: usize = 1200;
 const IMAGE_HEIGHT: usize = const {
     let height: usize = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as usize;
     if height < 1 { 1 } else { height }
@@ -26,6 +28,8 @@ pub struct Camera {
     pixel00_loc: Vec3,
     pixel_delta_u: Vec3,
     pixel_delta_v: Vec3,
+    defocus_disk_u: Vec3,
+    defocus_disk_v: Vec3,
 }
 
 impl Camera {
@@ -33,21 +37,24 @@ impl Camera {
         let w: Vec3 = (LOOK_FROM - LOOK_AT).unit_vector();
         let u: Vec3 = VUP.cross(&w).unit_vector();
         let v: Vec3 = w.cross(&u);
-        let focal_length = (LOOK_FROM - LOOK_AT).length();
+        let defocus_radius = FOCUS_DIST * (DEFOCUS_ANGLE / 2.0).to_radians().tan();
+
         let h: f64 = (THETA / 2.0).tan();
-        let viewport_height: f64 = 2.0 * h * focal_length;
+        let viewport_height: f64 = 2.0 * h * FOCUS_DIST;
         let viewport_width: f64 = viewport_height * IMAGE_WIDTH as f64 / IMAGE_HEIGHT as f64;
         let viewport_u: Vec3 = Vec3::splat(viewport_width) * u;
         let viewport_v: Vec3 = Vec3::splat(viewport_height) * -v;
         let pixel_delta_u: Vec3 = viewport_u / Vec3::splat(IMAGE_WIDTH as f64);
         let pixel_delta_v: Vec3 = viewport_v / Vec3::splat(IMAGE_HEIGHT as f64);
         let viewport_upper_left: Vec3 = CENTER
-            - (Vec3::splat(focal_length) * w)
+            - (Vec3::splat(FOCUS_DIST) * w)
             - viewport_u / Vec3::splat(2.0)
             - viewport_v / Vec3::splat(2.0);
 
         Self {
             pixel00_loc: Vec3::splat(0.5) * (pixel_delta_u + pixel_delta_v) + viewport_upper_left,
+            defocus_disk_u: u * Vec3::splat(defocus_radius),
+            defocus_disk_v: v * Vec3::splat(defocus_radius),
             pixel_delta_u,
             pixel_delta_v,
         }
@@ -70,7 +77,30 @@ impl Camera {
             let mut hit_value = Vec3::ZERO;
             for _ in 0..ANTI_ALIACING_SAMPLES {
                 let mut ray = self.get_ray(column as f64, row as f64);
-                hit_value = hit_value + ray.cast(world, MAX_BOUNCE_DEPTH);
+                let mut color = Vec3::ONE;
+                for _ in 0..MAX_BOUNCE_DEPTH {
+                    world.hit(&mut ray);
+                    if let Some(hit) = ray.hit {
+                        let scatter = match hit.material.scatter(&hit, &ray.direction) {
+                            Some(v) => v,
+                            None => {
+                                color = Vec3::ZERO;
+                                break;
+                            }
+                        };
+
+                        ray = scatter.ray;
+                        color = color * scatter.color;
+                    } else {
+                        let unit_direction = ray.direction.unit_vector();
+                        let a = Vec3::splat(0.5 * (unit_direction.y() + 1.0));
+                        color =
+                            color * ((Vec3::ONE - a) * Vec3::ONE + a * Vec3::new(0.5, 0.7, 1.0));
+                        break;
+                    }
+                }
+
+                hit_value = hit_value + color;
             }
 
             pixels_buffer[IMAGE_WIDTH * row + column] = (hit_value * PIXEL_SAMPLES_SCALE).into();
@@ -86,7 +116,19 @@ impl Camera {
         let pixel_sample = self.pixel00_loc
             + (Vec3::splat(i + offset.x()) * self.pixel_delta_u)
             + ((Vec3::splat(j + offset.y())) * self.pixel_delta_v);
-        Ray::new(CENTER, pixel_sample - CENTER)
+        let origin = if DEFOCUS_ANGLE > 0. {
+            self.defocus_disk_sample()
+        } else {
+            CENTER
+        };
+        Ray::new(origin, pixel_sample - CENTER)
+    }
+
+    fn defocus_disk_sample(&self) -> Vec3 {
+        let p = Vec3::random_in_unit_disk(-1., 1.);
+        CENTER
+            + (Vec3::splat(p.x()) * self.defocus_disk_u)
+            + (Vec3::splat(p.y()) * self.defocus_disk_v)
     }
 }
 
@@ -115,26 +157,6 @@ impl Ray {
 
     pub fn surrounds(&self, t: f64) -> bool {
         self.min_t < t && t < self.max_t
-    }
-
-    pub fn cast(&mut self, world: &World, depth: u16) -> Vec3 {
-        if depth == 0 {
-            return Vec3::ZERO;
-        }
-
-        world.hit(self);
-        if let Some(hit) = self.hit.as_ref() {
-            if let Some(scatter) = hit.material.scatter(hit, &self.direction) {
-                *self = scatter.ray;
-                return scatter.color * self.cast(world, depth - 1);
-            } else {
-                return Vec3::ZERO;
-            }
-        }
-
-        let unit_direction = self.direction.unit_vector();
-        let a = Vec3::splat(0.5 * (unit_direction.y() + 1.0));
-        (Vec3::ONE - a) * Vec3::ONE + a * Vec3::new(0.5, 0.7, 1.0)
     }
 }
 
