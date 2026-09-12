@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::{
     camera::{Hit, Ray},
@@ -17,7 +17,7 @@ impl World {
         }
     }
 
-    pub fn draw_sphere(&mut self, location: Vec3, radius: f64, material: Rc<Material>) {
+    pub fn draw_sphere(&mut self, location: Vec3, radius: f64, material: Arc<Material>) {
         self.spheres.push(Sphere {
             location,
             radius,
@@ -39,7 +39,7 @@ impl World {
 struct Sphere {
     location: Vec3,
     radius: f64,
-    material: Rc<Material>,
+    material: Arc<Material>,
 }
 
 impl Hittable for Sphere {

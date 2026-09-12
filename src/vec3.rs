@@ -68,13 +68,13 @@ impl Vec3 {
         self.dot(self).sqrt()
     }
 
-    pub fn unit_vector(self) -> Self {
+    pub const fn unit_vector(self) -> Self {
         Self {
             value: self.value / Simd::splat(self.length()),
         }
     }
 
-    pub fn cross(&self, rhs: &Self) -> Self {
+    pub const fn cross(&self, rhs: &Self) -> Self {
         let l = &self.value;
         let r = &rhs.value;
 

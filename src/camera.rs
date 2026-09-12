@@ -1,6 +1,7 @@
 use std::{
     io::{BufWriter, Stdout, Write},
-    rc::Rc,
+    sync::Arc,
+    thread,
 };
 
 use crate::{color::Color, material::Material, vec3::Vec3, world::World};
@@ -22,6 +23,10 @@ const IMAGE_HEIGHT: usize = const {
 const MAX_BOUNCE_DEPTH: u16 = 50;
 const CENTER: Vec3 = LOOK_FROM;
 
+const W: Vec3 = (LOOK_FROM - LOOK_AT).unit_vector();
+const U: Vec3 = VUP.cross(&W).unit_vector();
+const V: Vec3 = w.cross(&U);
+
 pub struct Camera {
     pixel00_loc: Vec3,
     pixel_delta_u: Vec3,
@@ -30,15 +35,12 @@ pub struct Camera {
 
 impl Camera {
     pub fn new() -> Self {
-        let w: Vec3 = (LOOK_FROM - LOOK_AT).unit_vector();
-        let u: Vec3 = VUP.cross(&w).unit_vector();
-        let v: Vec3 = w.cross(&u);
         let focal_length = (LOOK_FROM - LOOK_AT).length();
         let h: f64 = (THETA / 2.0).tan();
         let viewport_height: f64 = 2.0 * h * focal_length;
         let viewport_width: f64 = viewport_height * IMAGE_WIDTH as f64 / IMAGE_HEIGHT as f64;
-        let viewport_u: Vec3 = Vec3::splat(viewport_width) * u;
-        let viewport_v: Vec3 = Vec3::splat(viewport_height) * -v;
+        let viewport_u: Vec3 = Vec3::splat(viewport_width) * U;
+        let viewport_v: Vec3 = Vec3::splat(viewport_height) * - V;
         let pixel_delta_u: Vec3 = viewport_u / Vec3::splat(IMAGE_WIDTH as f64);
         let pixel_delta_v: Vec3 = viewport_v / Vec3::splat(IMAGE_HEIGHT as f64);
         let viewport_upper_left: Vec3 = CENTER
@@ -55,27 +57,25 @@ impl Camera {
 
     pub fn render(&self, world: &World) {
         let mut pixels_buffer = vec![Color::BLACK; IMAGE_WIDTH * IMAGE_HEIGHT];
-        // pixels_buffer.fill([0u8; 3]);
         let mut writer = std::io::BufWriter::new(std::io::stdout());
-        // var threads = try self.alloc.alloc(std.Thread, image_height);
-        for j in 0..IMAGE_HEIGHT {
-            // threads[j] = try std.Thread.spawn(.{}, renderColumns, .{ world, j, pixels_buffer, &pr });
-            self.render_columns(world, j, &mut pixels_buffer);
+
+        for column in 0..IMAGE_WIDTH {
+                self.render_columns(world, column, &mut pixels_buffer);
         }
 
         draw_pixels(&mut writer, &pixels_buffer);
         let _ = writer.flush();
     }
 
-    fn render_columns(&self, world: &World, row: usize, pixels_buffer: &mut [Color]) {
-        for i in 0..IMAGE_WIDTH {
+    fn render_columns(&self, world: &World, column: usize, pixels_buffer: &mut [Color]) {
+        for row in 0..IMAGE_HEIGHT {
             let mut hit_value = Vec3::ZERO;
             for _ in 0..ANTI_ALIACING_SAMPLES {
-                let mut ray = self.get_ray(i as f64, row as f64);
+                let mut ray = self.get_ray(column as f64, row as f64);
                 hit_value = hit_value + ray.cast(world, MAX_BOUNCE_DEPTH);
             }
 
-            pixels_buffer[IMAGE_WIDTH * row + i] = (hit_value * PIXEL_SAMPLES_SCALE).into();
+            pixels_buffer[IMAGE_WIDTH * row + column] = (hit_value * PIXEL_SAMPLES_SCALE).into();
         }
     }
 
@@ -143,12 +143,12 @@ impl Ray {
 pub struct Hit {
     pub normal: Vec3,
     pub p: Vec3,
-    pub material: Rc<Material>,
+    pub material: Arc<Material>,
     pub front_face: bool,
 }
 
 impl Hit {
-    pub fn new(normal: Vec3, p: Vec3, ray: &Ray, m: Rc<Material>) -> Self {
+    pub fn new(normal: Vec3, p: Vec3, ray: &Ray, m: Arc<Material>) -> Self {
         let front_face = ray.direction.dot(&normal) < 0.;
         let hit_normal = if front_face { normal } else { -normal };
         Hit {
