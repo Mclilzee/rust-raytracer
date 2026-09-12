@@ -1,6 +1,7 @@
 use std::{
     io::{BufWriter, Stdout, Write},
     sync::Arc,
+    thread,
 };
 
 use crate::{color::Color, material::Material, vec3::Vec3, world::World};
@@ -16,7 +17,7 @@ const THETA: f64 = f64::to_radians(VFOV);
 const ASPECT_RATIO: f64 = 16.0 / 9.0;
 const ANTI_ALIACING_SAMPLES: usize = 100;
 const PIXEL_SAMPLES_SCALE: Vec3 = Vec3::splat(1.0 / ANTI_ALIACING_SAMPLES as f64);
-const IMAGE_WIDTH: usize = 1200;
+const IMAGE_WIDTH: usize = 400;
 const IMAGE_HEIGHT: usize = const {
     let height: usize = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as usize;
     if height < 1 { 1 } else { height }
@@ -63,21 +64,28 @@ impl Camera {
     pub fn render(&self, world: &World) {
         let mut pixels_buffer = vec![Color::BLACK; IMAGE_WIDTH * IMAGE_HEIGHT];
         let mut writer = std::io::BufWriter::new(std::io::stdout());
+        let rows: &mut [Color] = &mut pixels_buffer;
 
-        for column in 0..IMAGE_WIDTH {
-            self.render_columns(world, column, &mut pixels_buffer);
-        }
+        thread::scope(|scope| {
+            for (row_idx, row_pixels) in rows.chunks_mut(IMAGE_WIDTH).enumerate() {
+                scope.spawn(move || {
+                    self.render_row(world, row_idx, row_pixels);
+                });
+            }
+        });
 
         draw_pixels(&mut writer, &pixels_buffer);
         let _ = writer.flush();
     }
 
-    fn render_columns(&self, world: &World, column: usize, pixels_buffer: &mut [Color]) {
-        for row in 0..IMAGE_HEIGHT {
+    fn render_row(&self, world: &World, row: usize, row_pixels: &mut [Color]) {
+        for (column, pixel) in row_pixels.iter_mut().enumerate() {
             let mut hit_value = Vec3::ZERO;
+
             for _ in 0..ANTI_ALIACING_SAMPLES {
                 let mut ray = self.get_ray(column as f64, row as f64);
                 let mut color = Vec3::ONE;
+
                 for _ in 0..MAX_BOUNCE_DEPTH {
                     world.hit(&mut ray);
                     if let Some(hit) = ray.hit {
@@ -103,7 +111,7 @@ impl Camera {
                 hit_value = hit_value + color;
             }
 
-            pixels_buffer[IMAGE_WIDTH * row + column] = (hit_value * PIXEL_SAMPLES_SCALE).into();
+            *pixel = (hit_value * PIXEL_SAMPLES_SCALE).into();
         }
     }
 
