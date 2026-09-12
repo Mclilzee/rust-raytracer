@@ -1,7 +1,6 @@
 use std::{
     io::{BufWriter, Stdout, Write},
     sync::Arc,
-    thread,
 };
 
 use crate::{color::Color, material::Material, vec3::Vec3, world::World};
@@ -23,10 +22,6 @@ const IMAGE_HEIGHT: usize = const {
 const MAX_BOUNCE_DEPTH: u16 = 50;
 const CENTER: Vec3 = LOOK_FROM;
 
-const W: Vec3 = (LOOK_FROM - LOOK_AT).unit_vector();
-const U: Vec3 = VUP.cross(&W).unit_vector();
-const V: Vec3 = w.cross(&U);
-
 pub struct Camera {
     pixel00_loc: Vec3,
     pixel_delta_u: Vec3,
@@ -35,12 +30,15 @@ pub struct Camera {
 
 impl Camera {
     pub fn new() -> Self {
+        let w: Vec3 = (LOOK_FROM - LOOK_AT).unit_vector();
+        let u: Vec3 = VUP.cross(&w).unit_vector();
+        let v: Vec3 = w.cross(&u);
         let focal_length = (LOOK_FROM - LOOK_AT).length();
         let h: f64 = (THETA / 2.0).tan();
         let viewport_height: f64 = 2.0 * h * focal_length;
         let viewport_width: f64 = viewport_height * IMAGE_WIDTH as f64 / IMAGE_HEIGHT as f64;
-        let viewport_u: Vec3 = Vec3::splat(viewport_width) * U;
-        let viewport_v: Vec3 = Vec3::splat(viewport_height) * - V;
+        let viewport_u: Vec3 = Vec3::splat(viewport_width) * u;
+        let viewport_v: Vec3 = Vec3::splat(viewport_height) * -v;
         let pixel_delta_u: Vec3 = viewport_u / Vec3::splat(IMAGE_WIDTH as f64);
         let pixel_delta_v: Vec3 = viewport_v / Vec3::splat(IMAGE_HEIGHT as f64);
         let viewport_upper_left: Vec3 = CENTER
@@ -60,7 +58,7 @@ impl Camera {
         let mut writer = std::io::BufWriter::new(std::io::stdout());
 
         for column in 0..IMAGE_WIDTH {
-                self.render_columns(world, column, &mut pixels_buffer);
+            self.render_columns(world, column, &mut pixels_buffer);
         }
 
         draw_pixels(&mut writer, &pixels_buffer);

@@ -20,10 +20,18 @@ fn main() {
     for a in -11..11 {
         for b in -11..11 {
             let choose_mat = rand::random::<f64>();
-            let center = Vec3::new(a as f64 + 0.9 * rand::random::<f64>(), 0.2, b as f64 + 0.9 * rand::random::<f64>());
+            let center = Vec3::new(
+                a as f64 + 0.9 * rand::random::<f64>(),
+                0.2,
+                b as f64 + 0.9 * rand::random::<f64>(),
+            );
             if (center - Vec3::new(4., 0.2, 0.)).length() > 0.9 {
                 if choose_mat < 0.8 {
-                    let albedo = Vec3::new(rand::random::<f64>(), rand::random::<f64>(), rand::random::<f64>());
+                    let albedo = Vec3::new(
+                        rand::random::<f64>(),
+                        rand::random::<f64>(),
+                        rand::random::<f64>(),
+                    );
                     let sphere_material = Arc::new(Material::init_lambertian(albedo));
                     world.draw_sphere(center, 0.2, sphere_material);
                 } else if choose_mat < 0.95 {
