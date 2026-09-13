@@ -1,10 +1,9 @@
 use std::{
     io::{BufWriter, Stdout, Write},
-    sync::Arc,
     thread,
 };
 
-use crate::{color::Color, material::Material, vec3::Vec3, world::World};
+use crate::{color::Color, vec3::Vec3, world::World};
 
 const DEFOCUS_ANGLE: f64 = 0.06;
 const FOCUS_DIST: f64 = 10.0;
@@ -17,7 +16,7 @@ const THETA: f64 = f64::to_radians(VFOV);
 const ASPECT_RATIO: f64 = 16.0 / 9.0;
 const ANTI_ALIACING_SAMPLES: usize = 100;
 const PIXEL_SAMPLES_SCALE: Vec3 = Vec3::splat(1.0 / ANTI_ALIACING_SAMPLES as f64);
-const IMAGE_WIDTH: usize = 400;
+const IMAGE_WIDTH: usize = 1200;
 const IMAGE_HEIGHT: usize = const {
     let height: usize = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as usize;
     if height < 1 { 1 } else { height }
@@ -89,7 +88,8 @@ impl Camera {
                 for _ in 0..MAX_BOUNCE_DEPTH {
                     world.hit(&mut ray);
                     if let Some(hit) = ray.hit {
-                        let scatter = match hit.material.scatter(&hit, &ray.direction) {
+                        let material = world.get_material(hit.material_index).expect("Material should exist");
+                        let scatter = match material.scatter(&hit, &ray.direction) {
                             Some(v) => v,
                             None => {
                                 color = Vec3::ZERO;
@@ -171,19 +171,19 @@ impl Ray {
 pub struct Hit {
     pub normal: Vec3,
     pub p: Vec3,
-    pub material: Arc<Material>,
+    pub material_index: u16,
     pub front_face: bool,
 }
 
 impl Hit {
-    pub fn new(normal: Vec3, p: Vec3, ray: &Ray, m: Arc<Material>) -> Self {
+    pub fn new(normal: Vec3, p: Vec3, ray: &Ray, material_index: u16) -> Self {
         let front_face = ray.direction.dot(&normal) < 0.;
         let hit_normal = if front_face { normal } else { -normal };
         Hit {
             normal: hit_normal,
             p,
             front_face,
-            material: m,
+            material_index,
         }
     }
 }

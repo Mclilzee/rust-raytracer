@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     camera::{Hit, Ray},
     material::Material,
@@ -8,21 +6,33 @@ use crate::{
 
 pub struct World {
     spheres: Vec<Sphere>,
+    materials: Vec<Material>,
 }
 
 impl World {
     pub fn new() -> Self {
         Self {
             spheres: Vec::default(),
+            materials: Vec::default()
         }
     }
 
-    pub fn draw_sphere(&mut self, location: Vec3, radius: f64, material: Arc<Material>) {
+    pub fn add_material(&mut self, material: Material) -> u16 {
+        let index = self.materials.len();
+        self.materials.push(material);
+        index as u16
+    }
+
+    pub fn draw_sphere(&mut self, location: Vec3, radius: f64, material_index: u16) {
         self.spheres.push(Sphere {
             location,
             radius,
-            material,
+            material_index,
         });
+    }
+
+    pub fn get_material(&self, index: u16) -> Option<&Material> {
+        self.materials.get(index as usize)
     }
 
     pub fn hit(&self, ray: &mut Ray) {
@@ -39,7 +49,7 @@ impl World {
 struct Sphere {
     location: Vec3,
     radius: f64,
-    material: Arc<Material>,
+    material_index: u16,
 }
 
 impl Hittable for Sphere {
@@ -65,7 +75,7 @@ impl Hittable for Sphere {
         ray.max_t = root;
         let p = ray.at(root);
         let normal = (p - self.location) / self.radius;
-        ray.hit = Some(Hit::new(normal, p, ray, self.material.clone()));
+        ray.hit = Some(Hit::new(normal, p, ray, self.material_index));
     }
 }
 
