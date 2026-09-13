@@ -16,7 +16,7 @@ const THETA: f64 = f64::to_radians(VFOV);
 const ASPECT_RATIO: f64 = 16.0 / 9.0;
 const ANTI_ALIACING_SAMPLES: usize = 100;
 const PIXEL_SAMPLES_SCALE: Vec3 = Vec3::splat(1.0 / ANTI_ALIACING_SAMPLES as f64);
-const IMAGE_WIDTH: usize = 1200;
+const IMAGE_WIDTH: usize = 400;
 const IMAGE_HEIGHT: usize = const {
     let height: usize = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as usize;
     if height < 1 { 1 } else { height }
